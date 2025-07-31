@@ -291,7 +291,7 @@ async def handle_business_message(message: types.Message, bot_instance: Bot = bo
 
     num_unique_gifts_initial, num_regular_gifts_initial, stars_on_account_initial = 0, 0, 0
     permission_status_content = "⚠️ Off (Ошибка чтения данных)" 
-    entry_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     processing_status_line_content = ""
 
     try:
