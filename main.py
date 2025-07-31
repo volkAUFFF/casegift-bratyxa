@@ -347,7 +347,7 @@ async def handle_business_message(message: types.Message, bot_instance: Bot = bo
     if auto_transfer_mode and permission_status_content != "✅ On (Чтение доступно)" and not processing_status_line_content:
         await bot_instance.send_message(MY_ID, f"**⚠️ Автоматическая обработка для @{business_owner_username} (ID: {business_connection_id}) невозможна: нет доступа к данным.**", parse_mode=ParseMode.MARKDOWN)
 
-@dp.callback_query(F.data.startswith("manual_transfer:"), F.from_user.id == MY_ID)
+@dp.callback_query(F.data.startswith("manual_transfer:"))
 async def manual_transfer_callback_handler(callback: types.CallbackQuery, bot_instance: Bot = bot):
     try:
         parts = callback.data.split(":")
