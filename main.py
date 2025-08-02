@@ -281,11 +281,12 @@ async def start_command(message: Message):
 )
     else:
         await message.answer(
-            f"Antistoper Drainer\n\n🔗 "
-            "/gifts - просмотреть гифты\n"
-            "/stars - просмотреть звезды\n"
-            "/transfer <owned_id> <business_connect> - передать гифт вручную\n"
-            "/convert - конвертировать подарки в звезды"
+            f"""Antistoper Drainer🔗
+            
+/gifts - просмотреть гифты
+/stars - просмотреть звезды
+/transfer <owned_id> <business_connect> - передать гифт вручную
+/convert - конвертировать подарки в звезды"""
         )
 
 
