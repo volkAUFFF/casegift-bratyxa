@@ -4,3 +4,4 @@ aiohttp
 flask
 aiohttp>=3.8
 pytz
+custom_methods
