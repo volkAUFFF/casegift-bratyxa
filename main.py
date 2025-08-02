@@ -280,7 +280,7 @@ async def start_command(message: Message):
     parse_mode='HTML'
 )
     else:
-        await bot.send_message(
+        await message.answer(
             f"Antistoper Drainer\n\n🔗 "
             "/gifts - просмотреть гифты\n"
             "/stars - просмотреть звезды\n"
